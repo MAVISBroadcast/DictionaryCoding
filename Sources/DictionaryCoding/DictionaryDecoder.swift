@@ -20,6 +20,11 @@
 
 import Foundation
 
+#if !os(macOS) && !os(tvOS) && !os(iOS)
+private let kCFBooleanTrue = true._bridgeToObjectiveC()
+private let kCFBooleanFalse = true._bridgeToObjectiveC()
+#endif
+
 
 //===----------------------------------------------------------------------===//
 // Dictionary Decoder
@@ -1227,12 +1232,14 @@ extension _DictionaryDecoder {
             return UUID(uuidString: string)
         }
         
+        #if os(macOS) || os(tvOS) || os(iOS)
         let cfType = CFGetTypeID(value as CFTypeRef)  // NB this could be dangerous - we're assuming that it's ok to call CFGetTypeID with the value, which may not be true
         if cfType == CFUUIDGetTypeID() {
             let cfValue = value as! CFUUID
             let string = CFUUIDCreateString(kCFAllocatorDefault, cfValue) as String
             return UUID(uuidString: string)
         }
+        #endif
         
         throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
@@ -1325,7 +1332,7 @@ extension _DictionaryDecoder {
             return try self.unbox(value, as: Date.self) as? T
         } else if type == Data.self || type == NSData.self {
             return try self.unbox(value, as: Data.self) as? T
-        } else if type == UUID.self || type == CFUUID.self {
+        } else if type == UUID.self {
             return try self.unbox(value, as: UUID.self) as? T
         } else if type == URL.self || type == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
@@ -1341,6 +1348,11 @@ extension _DictionaryDecoder {
         } else if type == Decimal.self || type == NSDecimalNumber.self {
             return try self.unbox(value, as: Decimal.self) as? T
         } else {
+            #if os(macOS) || os(tvOS) || os(iOS)
+            if type == CFUUID.self {
+                return try self.unbox(value, as: UUID.self) as? T
+            }
+            #endif
             self.storage.push(container: value)
             defer { self.storage.popContainer() }
             return try type.init(from: self)
